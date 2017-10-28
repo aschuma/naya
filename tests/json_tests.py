@@ -233,6 +233,18 @@ class TestJsonTokenization(unittest.TestCase):
         arr = stream_array(tokenize(StringIO('["Apples", ["Pears", "Limes"], "Bananas"]')))
         self.assertListEqual([i for i in arr], ["Apples", ["Pears", "Limes"], "Bananas"])
 
+    def test_stream_array_objects(self):
+        arr = stream_array(tokenize(StringIO('[{"key": "val"}]')))
+        self.assertListEqual([i for i in arr], [{"key": "val"}])
+        arr = stream_array(tokenize(StringIO('[{"key": "val"}, {"key": "val"}]')))
+        self.assertListEqual([i for i in arr], [{"key": "val"}, {"key": "val"}])
+        arr = stream_array(tokenize(StringIO('[{"key": {"moo": "blah"}}, {"key": "val"}]')))
+        self.assertListEqual([i for i in arr], [{"key": {"moo": "blah"}}, {"key": "val"}])
+
+    def test_stream_array_missing_comma(self):
+        tokens = tokenize(StringIO('["key" "val"]'))
+        self.assertRaises(ValueError, list, stream_array(tokens))
+
     def test_large_sample(self):
         with open("tests/sample.json", "r", encoding="utf-8") as file:
             obj2 = json.load(file)

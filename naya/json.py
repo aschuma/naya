@@ -1,3 +1,4 @@
+from __future__ import generator_stop
 from io import StringIO
 
 
@@ -546,21 +547,46 @@ def stream_array(token_stream):
     if token_type != TOKEN_TYPE.OPERATOR or token != '[':
         raise ValueError("Array must start with '['.  Got '{}'".format(token))
 
+    can_end = True
+    tolerate_extra_comma = False
+
     while True:
-        token_type, token = next(token_stream)
+        # Try to read a value
+        try:
+            token_type, token = next(token_stream)
+            # print(repr((token_type, token)))
+        except StopIteration:
+            return
+        if token_type != TOKEN_TYPE.OPERATOR:
+            yield token
+        else:
+            if token == "[" or token == "{":
+                yield __parse(token_stream, (token_type, token))
+                # this seems to eat a comma following lists, so go to next value
+                tolerate_extra_comma = True
+                can_end = True
+                continue
+            elif can_end and token == ']':
+                return
+            elif tolerate_extra_comma and token == ',':
+                tolerate_extra_comma = False
+                continue
+            else:
+                raise ValueError("Expected an array value.  Got '{}'".format(token))
+
+        can_end = False
+
+        # Try to read a delimiter
+        try:
+            token_type, token = next(token_stream)
+            # print(repr((token_type, token)))
+        except StopIteration:
+            return
         if token_type == TOKEN_TYPE.OPERATOR:
             if token == ']':
                 return
             elif token == ",":
-                token_type, token = next(token_stream)
-                if token_type == TOKEN_TYPE.OPERATOR:
-                    if token == "[" or token == "{":
-                        yield __parse(token_stream, (token_type, token))
-                    else:
-                        raise ValueError("Expected an array value.  Got '{}'".format(token))
-                else:
-                    yield token
-            else:
-                raise ValueError("Array entries must be followed by ',' or ']'.  Got '{}'".format(token))
-        else:
-            yield token
+                # get next value
+                continue
+
+        raise ValueError("Array entries must be followed by ',' or ']'.  Got '{}'".format(token))
