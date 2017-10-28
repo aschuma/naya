@@ -46,9 +46,10 @@ def tokenize(stream):
     charcode = 0
     completed = False
     now_token = ""
+    saw_high_surrogate = 0
 
     def process_char(char, charcode):
-        nonlocal token, completed, now_token
+        nonlocal token, completed, now_token, saw_high_surrogate
         advance = True
         add_char = False
         next_state = state
@@ -305,10 +306,25 @@ def tokenize(stream):
             else:
                 raise ValueError("Invalid character code: {}".format(char))
             next_state = __TOKENIZER_STATE.STRING
-            char = chr(charcode)
-            add_char = True
+            if 0xD800 <= charcode <= 0xDBFF:
+                if saw_high_surrogate:
+                    raise ValueError("Expected low surrogate, but found high surrogate \\u{}".format(charcode))
+                saw_high_surrogate = charcode
+            elif 0xDC00 <= charcode <= 0xDFFF:
+                if not saw_high_surrogate:
+                    raise ValueError("Unpaired low surrogate \\u{}, expected high surrogate first".format(charcode))
+
+                charcode = 0x10000 + (saw_high_surrogate - 0xD800) * 0x400 + (charcode - 0xDC00)
+                saw_high_surrogate = 0
+                char = chr(charcode)
+                add_char = True
+            else:
+                char = chr(charcode)
+                add_char = True
 
         if add_char:
+            if saw_high_surrogate:
+                raise ValueError("Unpaired high surrogate \\u{}, expected low surrogate to follow".format(charcode))
             token.append(char)
 
         return advance, next_state, charcode

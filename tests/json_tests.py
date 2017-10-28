@@ -86,6 +86,10 @@ class TestJsonTokenization(unittest.TestCase):
         self.assertRaises(ValueError, self.tokenize_single_token, "\"\\!\"")
         self.assertRaises(ValueError, self.tokenize_single_token, "\"\\u!\"")
 
+    def test_surrogates(self):
+        # should not result in broken str '\ud83d\ude42'
+        self.assertStringEquals("🙂", "\\ud83d\\ude42")
+
     def test_sequence(self):
         result = [token for token in tokenize(StringIO("123 \"abc\":{}"))]
         self.assertEqual(result, [(2, 123), (1, 'abc'), (0, ':'), (0, '{'), (0, '}')])
